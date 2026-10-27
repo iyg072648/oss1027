@@ -1,0 +1,76 @@
+name: Deploy Lean MVP to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # 1. Lean Validation: 자막 파싱 및 핵심 기능 유효성 테스트
+  validate:
+    runs-on: ubuntu-latest
+    name: "Lean MVP Validation & Sanity Check"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (for validation scripts)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate MVP Assets & HTML Integrity
+        run: |
+          echo "🔍 [Lean Check 1/3] 필수 파일(PRD.md, index.html, README.md) 존재 여부 검증..."
+          test -f PRD.md || (echo "❌ PRD.md 누락" && exit 1)
+          test -f index.html || (echo "❌ index.html 누락" && exit 1)
+          test -f README.md || (echo "❌ README.md 누락" && exit 1)
+
+          echo "🔍 [Lean Check 2/3] index.html 내 핵심 기능 태그(파서, 캔버스, 복사 기능) 검증..."
+          grep -q "parseSubtitle" index.html || (echo "❌ 자막 파서 함수 누락" && exit 1)
+          grep -q "thumbnailCanvas" index.html || (echo "❌ 썸네일 캔버스 누락" && exit 1)
+          grep -q "feedbackUp" index.html || (echo "❌ 피드백 수집 위젯 누락" && exit 1)
+
+          echo "🔍 [Lean Check 3/3] PRD 가설 및 Build-Measure-Learn 명시 확인..."
+          grep -q "Build - Measure - Learn" PRD.md || (echo "❌ PRD 내 린 피드백 루프 미포함" && exit 1)
+
+          echo "✅ 모든 Lean Startup MVP 유효성 검증을 통과했습니다!"
+
+  # 2. Deploy: 가설 검증을 위한 GitHub Pages 자동 배포 (실제 크리에이터 피드백 수집용)
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # index.html이 있는 루트 디렉토리 배포
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
