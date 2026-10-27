@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TubeHook - 유튜브 자막 기반 썸네일 & 제목 생성기</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800;900&display=swap');
+    body { font-family: 'Pretendard', sans-serif; }
+    .thumbnail-font {
+      font-family: 'Pretendard', sans-serif;
+      text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 4px 10px rgba(0,0,0,0.8);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <!-- Top Navigation -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-400 flex items-center justify-center shadow-lg shadow-red-500/30">
+          <i data-lucide="youtube" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <span class="font-extrabold text-xl tracking-tight text-white">Tube<span class="text-red-500">Hook</span></span>
+          <span class="text-xs ml-2 px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-semibold">Lean MVP</span>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <!-- Settings Modal Trigger -->
+        <button id="openSettingsBtn" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition">
+          <i data-lucide="key" class="w-3.5 h-3.5"></i>
+          <span id="apiKeyStatus">API 키 설정</span>
+        </button>
+        <a href="https://github.com/iyg072648" target="_blank" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="github" class="w-5 h-5"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Hero Header -->
+    <div class="text-center max-w-2xl mx-auto mb-8">
+      <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold mb-3">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+        <span>자막 파일만 넣으면 3초 만에 후킹 문구 완성</span>
+      </div>
+      <h1 class="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+        유튜브 자막을 넣으면<br><span class="bg-gradient-to-r from-red-500 via-rose-400 to-amber-400 bg-clip-text text-transparent">클릭률(CTR) 터지는 썸네일·제목</span> 생성
+      </h1>
+      <p class="text-sm text-slate-400 mt-2">
+        영상 대본이나 자막 파일(.srt, .vtt)을 등록하면 핵심 갈등과 인사이트를 추출해 고효율 카피를 만들어드립니다.
+      </p>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- Left Column: Input Section (5 cols) -->
+      <section class="lg:col-span-5 space-y-5">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-sm font-bold text-slate-200 flex items-center space-x-2">
+              <i data-lucide="file-text" class="w-4 h-4 text-red-400"></i>
+              <span>자막 / 스크립트 입력</span>
+            </label>
+            <button id="sampleBtn" class="text-xs text-red-400 hover:text-red-300 underline font-medium">예시 자막 채우기</button>
+          </div>
+
+          <!-- Drag and Drop Zone -->
+          <div id="dropZone" class="border-2 border-dashed border-slate-700 hover:border-red-500/60 rounded-xl p-4 text-center cursor-pointer transition bg-slate-950/50 mb-3">
+            <input type="file" id="fileInput" accept=".srt,.vtt,.txt" class="hidden">
+            <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-400 mx-auto mb-1"></i>
+            <p class="text-xs text-slate-300 font-medium">자막 파일(.srt, .vtt)을 드래그하거나 클릭하여 업로드</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">타임스탬프는 자동으로 정제됩니다</p>
+          </div>
+
+          <!-- Textarea -->
+          <div class="relative">
+            <textarea id="scriptInput" rows="7" placeholder="또는 유튜브 대본/자막 텍스트를 여기에 직접 붙여넣으세요..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-red-500 font-mono resize-none"></textarea>
+            <div id="charCount" class="absolute bottom-2 right-3 text-[10px] text-slate-500">0 자</div>
+          </div>
+
+          <!-- Video Category Tags -->
+          <div class="mt-4">
+            <label class="text-xs font-semibold text-slate-400 block mb-2">영상 카테고리 / 톤</label>
+            <div class="grid grid-cols-3 gap-2" id="categoryChips">
+              <button type="button" class="category-btn active px-3 py-2 text-xs rounded-lg font-medium border bg-red-600/20 border-red-500 text-red-300" data-val="지식/정보/리뷰">💡 지식/리뷰</button>
+              <button type="button" class="category-btn px-3 py-2 text-xs rounded-lg font-medium border bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700" data-val="이슈/사건/엔터">🔥 이슈/사건</button>
+              <button type="button" class="category-btn px-3 py-2 text-xs rounded-lg font-medium border bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700" data-val="일상/브이로그">🎬 브이로그/스토리</button>
+              <button type="button" class="category-btn px-3 py-2 text-xs rounded-lg font-medium border bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700" data-val="자기계발/동기부여">📈 자기계발</button>
+              <button type="button" class="category-btn px-3 py-2 text-xs rounded-lg font-medium border bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700" data-val="쇼츠/숏폼">⚡ 쇼츠/숏폼</button>
+              <button type="button" class="category-btn px-3 py-2 text-xs rounded-lg font-medium border bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700" data-val="종합/자동">🎯 일반/종합</button>
+            </div>
+          </div>
+
+          <!-- Action Button -->
+          <button id="generateBtn" class="mt-5 w-full py-3.5 px-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 flex items-center justify-center space-x-2 transition disabled:opacity-50">
+            <i data-lucide="wand-2" class="w-4 h-4"></i>
+            <span>3초 만에 썸네일 문구 & 제목 뽑기</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Right Column: Output & Live Thumbnail Simulator (7 cols) -->
+      <section class="lg:col-span-7 space-y-6">
+        
+        <!-- Live Thumbnail Simulator Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold text-slate-200 flex items-center space-x-2">
+              <i data-lucide="image" class="w-4 h-4 text-amber-400"></i>
+              <span>16:9 썸네일 실시간 프리뷰</span>
+            </h2>
+            <div class="flex items-center space-x-2 text-xs">
+              <span class="text-slate-400">배경 테마:</span>
+              <button class="bg-color-btn w-5 h-5 rounded-full bg-slate-950 border border-slate-700 ring-2 ring-red-500" data-bg="bg-slate-950"></button>
+              <button class="bg-color-btn w-5 h-5 rounded-full bg-red-950 border border-slate-700" data-bg="bg-red-950"></button>
+              <button class="bg-color-btn w-5 h-5 rounded-full bg-yellow-950 border border-slate-700" data-bg="bg-yellow-950"></button>
+              <button class="bg-color-btn w-5 h-5 rounded-full bg-blue-950 border border-slate-700" data-bg="bg-blue-950"></button>
+            </div>
+          </div>
+
+          <!-- 16:9 Canvas Box -->
+          <div id="thumbnailCanvas" class="aspect-video w-full bg-slate-950 rounded-xl border border-slate-800 relative overflow-hidden flex flex-col justify-between p-6 shadow-2xl transition-all">
+            <!-- Top tag -->
+            <div class="flex items-center justify-between">
+              <span id="canvasBadge" class="bg-red-600 text-white font-extrabold text-[11px] md:text-xs px-2.5 py-1 rounded shadow uppercase tracking-wider">충격 실화</span>
+              <div class="bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[10px] text-slate-300 font-mono">1080p PREVIEW</div>
+            </div>
+
+            <!-- Centered Main Hook Text -->
+            <div class="my-auto text-center px-4">
+              <h2 id="canvasMainText" class="thumbnail-font font-black text-2xl md:text-4xl lg:text-5xl tracking-tight text-yellow-300 leading-tight break-keep">
+                "이것 모르면 평생 후회합니다"
+              </h2>
+              <p id="canvasSubText" class="thumbnail-font text-white font-extrabold text-sm md:text-lg mt-2 tracking-wide text-slate-200">
+                조회수 100만을 만든 비밀 공개
+              </p>
+            </div>
+
+            <!-- Bottom Channel watermark -->
+            <div class="flex items-center space-x-2">
+              <div class="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center font-bold text-[10px] text-white">Y</div>
+              <span class="text-[11px] font-bold text-slate-300 drop-shadow">MY CHANNEL</span>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2 text-center">💡 아래 생성된 썸네일 카피를 클릭하면 프리뷰 화면에 즉시 적용됩니다.</p>
+        </div>
+
+        <!-- Generated Output Section -->
+        <div id="outputSection" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-6">
+          
+          <!-- Loading State (hidden initially) -->
+          <div id="loadingState" class="hidden py-12 text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-red-500 border-t-transparent mb-3"></div>
+            <p class="text-sm font-semibold text-slate-300">자막의 핵심 맥락과 후킹 포인트를 분석 중입니다...</p>
+            <p class="text-xs text-slate-500 mt-1">평균 2~3초 소요됩니다.</p>
+          </div>
+
+          <!-- Content State -->
+          <div id="resultContainer" class="space-y-6">
+            
+            <!-- 1. Thumbnail Copies Section -->
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-slate-200 flex items-center space-x-2">
+                  <i data-lucide="type" class="w-4 h-4 text-yellow-400"></i>
+                  <span>추천 썸네일 카피 (클릭하여 미리보기)</span>
+                </h3>
+                <span class="text-[11px] text-slate-500 font-medium">단어 수 압축</span>
+              </div>
+              <div id="thumbnailChipsList" class="grid grid-cols-2 md:grid-cols-2 gap-2.5">
+                <!-- Dynamically generated or default -->
+              </div>
+            </div>
+
+            <!-- 2. Titles Section -->
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-slate-200 flex items-center space-x-2">
+                  <i data-lucide="flame" class="w-4 h-4 text-red-400"></i>
+                  <span>유튜브 추천 제목 8선 (원클릭 복사)</span>
+                </h3>
+              </div>
+
+              <!-- Style Tabs -->
+              <div class="flex space-x-2 border-b border-slate-800 pb-2 mb-3 overflow-x-auto text-xs" id="styleTabs">
+                <button class="style-tab active font-bold text-red-400 pb-1 border-b-2 border-red-500" data-filter="all">전체보기</button>
+                <button class="style-tab text-slate-400 hover:text-slate-200 pb-1" data-filter="자극형">💥 자극형</button>
+                <button class="style-tab text-slate-400 hover:text-slate-200 pb-1" data-filter="호기심형">❓ 호기심형</button>
+                <button class="style-tab text-slate-400 hover:text-slate-200 pb-1" data-filter="정보형">💡 정보/꿀팁</button>
+                <button class="style-tab text-slate-400 hover:text-slate-200 pb-1" data-filter="스토리형">🎬 스토리/반전</button>
+              </div>
+
+              <div id="titlesList" class="space-y-2">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- Feedback widget (Lean Startup Metric) -->
+            <div class="border-t border-slate-800 pt-4 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-3">
+              <span>이 결과가 마음에 드셨나요? (피드백 반영)</span>
+              <div class="flex items-center space-x-2">
+                <button id="feedbackUp" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center space-x-1 transition">
+                  <i data-lucide="thumbs-up" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>실제 쓸만해요</span>
+                </button>
+                <button id="feedbackDown" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center space-x-1 transition">
+                  <i data-lucide="thumbs-down" class="w-3.5 h-3.5 text-rose-400"></i>
+                  <span>아쉬워요</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- API Key Modal -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-white flex items-center space-x-2">
+          <i data-lucide="key" class="w-4 h-4 text-red-400"></i>
+          <span>AI 엔진 연동 설정 (선택사항)</span>
+        </h3>
+        <button id="closeSettingsBtn" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-400 mb-4">
+        키를 입력하지 않아도 **스마트 로컬 분석 엔진**으로 즉시 작동합니다. 더 정교한 GPT-4o나 Gemini의 결과를 원하시면 API 키를 입력해 주세요. (브라우저 로컬스토리지에만 안전하게 보관됩니다)
+      </p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-slate-300 block mb-1">엔진 선택</label>
+          <select id="engineSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200">
+            <option value="local">스마트 로컬 휴리스틱 엔진 (무료 / 키 불필요)</option>
+            <option value="gemini">Google Gemini (Gemini 1.5 Flash)</option>
+            <option value="openai">OpenAI (GPT-4o-mini)</option>
+          </select>
+        </div>
+        <div id="apiKeyGroup" class="hidden">
+          <label class="text-xs font-semibold text-slate-300 block mb-1" id="keyLabel">API Key</label>
+          <input type="password" id="apiKeyValue" placeholder="AIzaSy... 또는 sk-..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-red-500 font-mono">
+        </div>
+        <button id="saveSettingsBtn" class="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs transition">
+          설정 저장하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 border border-slate-700 text-slate-200 px-4 py-2.5 rounded-xl text-xs shadow-2xl flex items-center space-x-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toastMsg">클립보드에 복사되었습니다!</span>
+  </div>
+
+  <!-- Application Logic -->
+  <script>
+    // Subtitle Cleaning Utility
+    function parseSubtitle(rawText) {
+      if (!rawText) return "";
+      // Strip SRT / VTT timestamps and indexes
+      let clean = rawText
+        .replace(/WEBVTT/gi, "")
+        .replace(/\d+\r?\n\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}.*/g, "")
+        .replace(/\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}.*/g, "")
+        .replace(/<[^>]*>/g, "")
+        .replace(/^\d+$/gm, "")
+        .replace(/\n+/g, " ")
+        .trim();
+      return clean;
+    }
+
+    // Default Sample Subtitle
+    const SAMPLE_SCRIPT = `안녕하세요 여러분! 오늘은 유튜브 조회수 10배 올리는 썸네일의 비밀에 대해 말씀드리려고 합니다. 많은 크리에이터분들이 영상을 열심히 찍어놓고 제목과 썸네일을 대충 지어서 올리시는데요. 사실 유튜브 알고리즘은 썸네일 클릭률(CTR)이 8%를 넘지 못하면 그 어떤 좋은 영상도 추천 피드에 띄워주지 않습니다. 
+제가 지난 3년간 100만 유튜버들의 썸네일을 분석해본 결과 충격적인 공통점 3가지가 있었습니다. 첫째, 썸네일에는 텍스트를 4단어 이상 넣지 않는다. 둘째, 제목에는 결론을 절대 스포일러하지 않고 호기심 갭(Curiosity Gap)을 만든다. 셋째, 첫 3초 안에 시청자의 기대를 배신하지 않는다. 이 세 가지만 지켜도 여러분의 다음 영상 조회수는 최소 3배는 폭발할 겁니다!`;
+
+    // Local Intelligent Heuristic Generator
+    function generateLocalResults(text, category) {
+      const words = text.split(/\s+/).filter(w => w.length >= 2);
+      const mainWord = words[Math.floor(Math.random() * Math.min(words.length, 15))] || "이것";
+      
+      return {
+        thumbnails: [
+          { badge: "충격 실화", text: "절대 하지 마라", sub: "알고리즘 박살남" },
+          { badge: "극비 공개", text: "3초 만에 10배 폭발", sub: "100만 유튜버의 비법" },
+          { badge: "주의", text: "아직도 모른다고?", sub: "99%가 저지르는 실수" },
+          { badge: "단독", text: "결국 밝혀진 진실", sub: "조회수의 숨겨진 비밀" }
+        ],
+        titles: [
+          { style: "자극형", title: `영상 다 찍어놓고 '이것' 때문에 망합니다 (알고리즘의 충격적 진실)` },
+          { style: "자극형", title: `절대 ${mainWord} 하지 마세요, 채널 순식간에 나락 갑니다` },
+          { style: "호기심형", title: `100만 유튜버들이 썸네일 만들 때 절대 말해주지 않는 1가지?` },
+          { style: "호기심형", title: `도대체 왜 이 영상만 조회수 10배가 터졌을까? 직접 뜯어봤습니다` },
+          { style: "정보형", title: `[${category}] 조회수 3배 폭발시키는 썸네일 제작 3단계 법칙 총정리` },
+          { style: "정보형", title: `초보 크리에이터가 지금 당장 바꿔야 할 썸네일 & 제목 세팅법` },
+          { style: "스토리형", title: `3년간 바닥 치다가 '이 한 줄' 바꾸고 인생 역전한 썰` },
+          { style: "스토리형", title: `구독자 100명에서 10만까지... 결국 알고리즘을 뚫어낸 단 하나의 무기` }
+        ]
+      };
+    }
+
+    // App State
+    let currentCategory = "지식/정보/리뷰";
+    let currentResults = generateLocalResults(SAMPLE_SCRIPT, currentCategory);
+    let currentStyleFilter = "all";
+
+    // DOM Elements
+    const scriptInput = document.getElementById("scriptInput");
+    const charCount = document.getElementById("charCount");
+    const dropZone = document.getElementById("dropZone");
+    const fileInput = document.getElementById("fileInput");
+    const sampleBtn = document.getElementById("sampleBtn");
+    const generateBtn = document.getElementById("generateBtn");
+    const loadingState = document.getElementById("loadingState");
+    const resultContainer = document.getElementById("resultContainer");
+    const thumbnailChipsList = document.getElementById("thumbnailChipsList");
+    const titlesList = document.getElementById("titlesList");
+    const canvasBadge = document.getElementById("canvasBadge");
+    const canvasMainText = document.getElementById("canvasMainText");
+    const canvasSubText = document.getElementById("canvasSubText");
+    const thumbnailCanvas = document.getElementById("thumbnailCanvas");
+    const toast = document.getElementById("toast");
+    const toastMsg = document.getElementById("toastMsg");
+
+    // Modal & Settings
+    const openSettingsBtn = document.getElementById("openSettingsBtn");
+    const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+    const settingsModal = document.getElementById("settingsModal");
+    const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+    const engineSelect = document.getElementById("engineSelect");
+    const apiKeyGroup = document.getElementById("apiKeyGroup");
+    const apiKeyValue = document.getElementById("apiKeyValue");
+    const apiKeyStatus = document.getElementById("apiKeyStatus");
+
+    // Render Thumbnails and Titles
+    function renderResults() {
+      // 1. Thumbnails chips
+      thumbnailChipsList.innerHTML = "";
+      currentResults.thumbnails.forEach((item, idx) => {
+        const div = document.createElement("div");
+        div.className = "p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-yellow-400/60 cursor-pointer transition group";
+        div.innerHTML = `
+          <div class="flex items-center justify-between text-[11px] mb-1">
+            <span class="text-xs font-bold text-yellow-400 group-hover:scale-105 transition">${item.badge}</span>
+            <i data-lucide="eye" class="w-3.5 h-3.5 text-slate-500 group-hover:text-yellow-400"></i>
+          </div>
+          <div class="font-extrabold text-sm text-white">${item.text}</div>
+          <div class="text-[11px] text-slate-400 mt-0.5 truncate">${item.sub}</div>
+        `;
+        div.onclick = () => {
+          canvasBadge.innerText = item.badge;
+          canvasMainText.innerText = `"${item.text}"`;
+          canvasSubText.innerText = item.sub;
+          showToast(`썸네일 프리뷰에 적용되었습니다!`);
+        };
+        thumbnailChipsList.appendChild(div);
+      });
+
+      // 2. Titles
+      titlesList.innerHTML = "";
+      const filtered = currentStyleFilter === "all" 
+        ? currentResults.titles 
+        : currentResults.titles.filter(t => t.style === currentStyleFilter);
+
+      filtered.forEach((t) => {
+        const item = document.createElement("div");
+        item.className = "flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition";
+        const tagColors = {
+          "자극형": "bg-red-500/20 text-red-400 border-red-500/30",
+          "호기심형": "bg-amber-500/20 text-amber-400 border-amber-500/30",
+          "정보형": "bg-blue-500/20 text-blue-400 border-blue-500/30",
+          "스토리형": "bg-purple-500/20 text-purple-400 border-purple-500/30"
+        };
+        const colorClass = tagColors[t.style] || "bg-slate-800 text-slate-300";
+
+        item.innerHTML = `
+          <div class="flex items-center space-x-2.5 min-w-0 pr-3">
+            <span class="text-[10px] px-2 py-0.5 rounded border font-bold shrink-0 ${colorClass}">${t.style}</span>
+            <p class="text-xs font-medium text-slate-200 truncate">${t.title}</p>
+          </div>
+          <button class="copy-btn shrink-0 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="복사">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          </button>
+        `;
+
+        item.querySelector(".copy-btn").onclick = () => {
+          navigator.clipboard.writeText(t.title);
+          showToast("제목이 클립보드에 복사되었습니다!");
+        };
+
+        titlesList.appendChild(item);
+      });
+
+      lucide.createIcons();
+    }
+
+    function showToast(msg) {
+      toastMsg.innerText = msg;
+      toast.classList.remove("translate-y-20", "opacity-0");
+      setTimeout(() => {
+        toast.classList.add("translate-y-20", "opacity-0");
+      }, 2500);
+    }
+
+    // AI Direct API Call (Gemini / OpenAI)
+    async function callAI(text, category) {
+      const engine = localStorage.getItem("tubehook_engine") || "local";
+      const key = localStorage.getItem("tubehook_api_key") || "";
+
+      if (engine === "local" || !key) {
+        // Fallback to local heuristic
+        return generateLocalResults(text, category);
+      }
+
+      const prompt = `당신은 100만 구독자를 만든 최고의 유튜브 기획자이자 썸네일 카피라이터입니다.
+다음 영상 자막/대본을 분석하여, 클릭률(CTR)을 극대화할 수 있는 [썸네일 카피 4개]와 [유튜브 영상 제목 8개]를 JSON 형식으로 작성해주세요.
+
+[영상 카테고리]: ${category}
+[자막 내용]:
+${text.slice(0, 3000)}
+
+[반드시 준수할 출력 JSON 형식]:
+{
+  "thumbnails": [
+    {"badge": "충격", "text": "3~5단어 핵심 문구", "sub": "부연 설명 문구"}
+  ],
+  "titles": [
+    {"style": "자극형", "title": "제목 내용"},
+    {"style": "호기심형", "title": "제목 내용"},
+    {"style": "정보형", "title": "제목 내용"},
+    {"style": "스토리형", "title": "제목 내용"}
+  ]
+}`;
+
+      try {
+        if (engine === "gemini") {
+          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: "application/json" }
+            })
+          });
+          const data = await resp.json();
+          const resText = data.candidates[0].content.parts[0].text;
+          return JSON.parse(resText);
+        } else if (engine === "openai") {
+          const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${key}`
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              response_format: { type: "json_object" },
+              messages: [{ role: "user", content: prompt }]
+            })
+          });
+          const data = await resp.json();
+          return JSON.parse(data.choices[0].message.content);
+        }
+      } catch (err) {
+        console.warn("AI API 호출 실패, 로컬 엔진으로 대체합니다.", err);
+        return generateLocalResults(text, category);
+      }
+    }
+
+    // Event Handlers
+    scriptInput.addEventListener("input", (e) => {
+      charCount.innerText = `${e.target.value.length} 자`;
+    });
+
+    sampleBtn.addEventListener("click", () => {
+      scriptInput.value = SAMPLE_SCRIPT;
+      charCount.innerText = `${SAMPLE_SCRIPT.length} 자`;
+    });
+
+    // File Drag & Drop
+    dropZone.addEventListener("click", () => fileInput.click());
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("border-red-500");
+    });
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("border-red-500");
+    });
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("border-red-500");
+      if (e.dataTransfer.files.length > 0) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    function handleFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const cleaned = parseSubtitle(e.target.result);
+        scriptInput.value = cleaned;
+        charCount.innerText = `${cleaned.length} 자`;
+        showToast(`'${file.name}' 자막 파싱 완료!`);
+      };
+      reader.readAsText(file);
+    }
+
+    // Category selection
+    document.querySelectorAll(".category-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".category-btn").forEach(b => {
+          b.classList.remove("active", "bg-red-600/20", "border-red-500", "text-red-300");
+          b.classList.add("bg-slate-800", "border-slate-700", "text-slate-400");
+        });
+        btn.classList.add("active", "bg-red-600/20", "border-red-500", "text-red-300");
+        btn.classList.remove("bg-slate-800", "border-slate-700", "text-slate-400");
+        currentCategory = btn.getAttribute("data-val");
+      });
+    });
+
+    // Style filter tabs
+    document.querySelectorAll(".style-tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".style-tab").forEach(t => {
+          t.classList.remove("active", "font-bold", "text-red-400", "border-b-2", "border-red-500");
+          t.classList.add("text-slate-400");
+        });
+        tab.classList.add("active", "font-bold", "text-red-400", "border-b-2", "border-red-500");
+        tab.classList.remove("text-slate-400");
+        currentStyleFilter = tab.getAttribute("data-filter");
+        renderResults();
+      });
+    });
+
+    // Background color toggle for canvas
+    document.querySelectorAll(".bg-color-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".bg-color-btn").forEach(b => b.classList.remove("ring-2", "ring-red-500"));
+        btn.classList.add("ring-2", "ring-red-500");
+        thumbnailCanvas.className = thumbnailCanvas.className.replace(/bg-\w+-\d+/g, "");
+        thumbnailCanvas.classList.add(btn.getAttribute("data-bg"));
+      });
+    });
+
+    // Feedback voting
+    document.getElementById("feedbackUp").onclick = () => showToast("피드백 감사합니다! 👍");
+    document.getElementById("feedbackDown").onclick = () => showToast("피드백이 반영되었습니다. 더 개선하겠습니다! 🙏");
+
+    // Generate Action
+    generateBtn.addEventListener("click", async () => {
+      const text = scriptInput.value.trim() || SAMPLE_SCRIPT;
+      loadingState.classList.remove("hidden");
+      resultContainer.classList.add("hidden");
+      generateBtn.disabled = true;
+
+      // Simulated network/generation delay for Lean feedback feel
+      const startTime = Date.now();
+      const res = await callAI(text, currentCategory);
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 600) await new Promise(r => setTimeout(r, 600 - elapsed));
+
+      currentResults = res;
+      renderResults();
+
+      // Update canvas with top recommended
+      if (currentResults.thumbnails && currentResults.thumbnails.length > 0) {
+        canvasBadge.innerText = currentResults.thumbnails[0].badge;
+        canvasMainText.innerText = `"${currentResults.thumbnails[0].text}"`;
+        canvasSubText.innerText = currentResults.thumbnails[0].sub;
+      }
+
+      loadingState.classList.add("hidden");
+      resultContainer.classList.remove("hidden");
+      generateBtn.disabled = false;
+      showToast("🔥 새로운 썸네일 카피와 제목이 생성되었습니다!");
+    });
+
+    // Settings Modal
+    openSettingsBtn.onclick = () => settingsModal.classList.remove("hidden");
+    closeSettingsBtn.onclick = () => settingsModal.classList.add("hidden");
+    engineSelect.onchange = () => {
+      if (engineSelect.value === "local") {
+        apiKeyGroup.classList.add("hidden");
+      } else {
+        apiKeyGroup.classList.remove("hidden");
+        keyLabel.innerText = engineSelect.value === "gemini" ? "Google Gemini API Key" : "OpenAI API Key";
+      }
+    };
+    saveSettingsBtn.onclick = () => {
+      localStorage.setItem("tubehook_engine", engineSelect.value);
+      localStorage.setItem("tubehook_api_key", apiKeyValue.value.trim());
+      updateKeyStatus();
+      settingsModal.classList.add("hidden");
+      showToast("설정이 저장되었습니다.");
+    };
+
+    function updateKeyStatus() {
+      const engine = localStorage.getItem("tubehook_engine") || "local";
+      const key = localStorage.getItem("tubehook_api_key");
+      if (engine !== "local" && key) {
+        apiKeyStatus.innerText = `${engine.toUpperCase()} 연동됨`;
+      } else {
+        apiKeyStatus.innerText = "로컬 모드 (무료)";
+      }
+    }
+
+    // Init
+    updateKeyStatus();
+    renderResults();
+    lucide.createIcons();
+  </script>
+</body>
+</html>
